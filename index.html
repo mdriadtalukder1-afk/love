@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>আমার প্রিয়তমা</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tiro+Bangla:ital@0;1&family=Hind+Siliguri:wght@400;500;600&display=swap">
+<style>
+/* Layout: one centered love-letter card over a dusk-rose sky of floating hearts; a sealed envelope opens to reveal the surprise. Single deliberate night-rose theme. */
+:root{
+  --sky1:#2a0f1f; --sky2:#5b1a3a; --rose:#ff7aa2; --blush:#ffd6e2;
+  --paper:#fff6f8; --ink:#4a1630; --gold:#f5c26b;
+  --display:"Tiro Bangla","Noto Serif Bengali",Georgia,serif;
+  --body:"Hind Siliguri","Noto Sans Bengali",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{min-height:100%}
+body{
+  background:radial-gradient(120% 80% at 50% 0%,var(--sky2),var(--sky1) 70%);
+  background-color:var(--sky1);
+  color:var(--blush); font-family:var(--body); font-size:17px; line-height:1.75;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:40px 64px; overflow-x:hidden; position:relative;
+}
+#hearts{position:fixed;inset:0;pointer-events:none;z-index:0}
+main{position:relative;z-index:1;max-width:620px;margin:0 auto;display:flex;flex-direction:column;gap:28px;align-items:center;text-align:center}
+.eyebrow{font-size:14px;letter-spacing:.12em;color:var(--gold)}
+h1{font-family:var(--display);font-weight:400;font-size:clamp(44px,11vw,76px);line-height:1.15;margin:0;color:#fff;text-wrap:balance;text-shadow:0 0 30px rgba(255,122,162,.55)}
+h1 em{color:var(--rose);font-style:italic}
+.beat{display:inline-block;animation:beat 1.4s ease-in-out infinite;color:var(--rose)}
+@keyframes beat{0%,100%{transform:scale(1)}15%{transform:scale(1.25)}30%{transform:scale(1)}45%{transform:scale(1.15)}}
+.letter{background:var(--paper);color:var(--ink);border-radius:6px;padding:32px 28px;text-align:left;box-shadow:0 20px 60px rgba(0,0,0,.45);font-family:var(--display);font-size:19px;line-height:1.9;max-width:100%;position:relative}
+.letter::before{content:"";position:absolute;inset:10px;border:1px solid rgba(74,22,48,.15);border-radius:3px;pointer-events:none}
+.letter p{margin:0 0 14px}
+.letter .sign{text-align:right;margin:20px 0 0;color:#a3305e}
+.reasons{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;width:100%}
+.reason{border:1px solid rgba(255,214,226,.25);border-radius:14px;padding:16px;font-size:15.5px;background:rgba(255,255,255,.04);text-align:left}
+.reason b{display:block;color:var(--gold);font-weight:500;font-size:13px;letter-spacing:.06em;margin-bottom:4px}
+h2{font-family:var(--display);font-weight:400;font-size:28px;margin:0;color:#fff}
+button{font-family:var(--body);font-size:18px;font-weight:600;color:var(--sky1);background:linear-gradient(135deg,var(--rose),var(--gold));border:0;border-radius:999px;padding:14px 30px;cursor:pointer;box-shadow:0 8px 24px rgba(255,122,162,.4);transition:transform .2s}
+button:hover{transform:translateY(-2px) scale(1.03)}
+button:focus-visible{outline:3px solid #fff;outline-offset:3px}
+#surprise{font-family:var(--display);font-size:clamp(26px,6vw,36px);color:#fff;line-height:1.5;animation:pop .6s ease-out}
+#surprise small{display:block;font-family:var(--body);font-size:16px;color:var(--blush);margin-top:10px}
+@keyframes pop{from{transform:scale(.7);opacity:.3}to{transform:scale(1);opacity:1}}
+footer{font-size:14px;color:rgba(255,214,226,.6)}
+@media (prefers-reduced-motion:reduce){.beat,#surprise{animation:none}}
+</style>
+</head>
+<body>
+
+<canvas id="hearts"></canvas>
+<main>
+  <div class="eyebrow">শুধু তোমার জন্য</div>
+  <h1>ভালোবাসি <em>তোমাকে</em> <span class="beat">♥</span></h1>
+
+  <article class="letter">
+    <p>আমার প্রিয়তমা,</p>
+    <p>তুমি আমার জীবনের সবচেয়ে সুন্দর গল্প। তোমার একটা হাসি আমার সারাদিনের ক্লান্তি মুছে দেয়, আর তোমার একটা কথা আমার মনকে শান্ত করে দেয়।</p>
+    <p>যেদিন থেকে তুমি এসেছ, প্রতিটা সকাল একটু বেশি উজ্জ্বল আর প্রতিটা রাত একটু বেশি মিষ্টি। তুমি পাশে থাকলে পৃথিবীটা অনেক সহজ মনে হয়।</p>
+    <p>আমি প্রতিদিন তোমাকে আরও একটু বেশি ভালোবাসি। আজও, কালও, সারাজীবন।</p>
+    <p class="sign">শুধু তোমার,<br>আমি ♥</p>
+  </article>
+
+  <h2>কেন তোমাকে এত ভালোবাসি</h2>
+  <div class="reasons">
+    <div class="reason"><b>তোমার হাসি</b>যা দেখলে আমার পুরো দিন ভালো হয়ে যায়।</div>
+    <div class="reason"><b>তোমার মন</b>এত নরম আর এত সুন্দর, আর কারো নেই।</div>
+    <div class="reason"><b>তোমার যত্ন</b>ছোট ছোট কথায় তুমি বুঝিয়ে দাও তুমি আমার পাশে আছ।</div>
+    <div class="reason"><b>শুধু তুমি</b>তুমি যেমন, ঠিক তেমনটাই আমার সবচেয়ে প্রিয়।</div>
+  </div>
+
+  <button id="openBtn" type="button">একটা সারপ্রাইজ আছে, চাপ দাও ♥</button>
+  <div id="surprise" hidden>তুমি আমার আজ, আমার কাল,<br>আমার চিরদিন। 💖<small>চোখ বন্ধ করো, আমি তোমাকে জড়িয়ে ধরে আছি।</small></div>
+
+  <footer>ভালোবাসা দিয়ে বানানো, শুধু তোমার জন্য</footer>
+</main>
+
+<script>
+(()=>{
+  const c=document.getElementById('hearts'),x=c.getContext('2d');
+  const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let W,H,hs=[];
+  const size=()=>{W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio;c.style.width=innerWidth+'px';c.style.height=innerHeight+'px'};
+  size();addEventListener('resize',size);
+  const make=(y,burst)=>({x:Math.random()*W,y:y??H+20,s:(8+Math.random()*16)*devicePixelRatio*(burst?1.4:1),v:(.4+Math.random()*1.1)*devicePixelRatio*(burst?2:1),w:Math.random()*6.28,a:.25+Math.random()*.5,h:Math.random()<.5?'255,122,162':'245,194,107'});
+  for(let i=0;i<34;i++)hs.push(make(Math.random()*H));
+  const heart=(h)=>{x.save();x.translate(h.x+Math.sin(h.w)*12,h.y);x.scale(h.s/16,h.s/16);x.fillStyle=`rgba(${h.h},${h.a})`;x.beginPath();x.moveTo(0,4);x.bezierCurveTo(0,-2,-8,-2,-8,4);x.bezierCurveTo(-8,9,0,13,0,16);x.bezierCurveTo(0,13,8,9,8,4);x.bezierCurveTo(8,-2,0,-2,0,4);x.fill();x.restore()};
+  const tick=()=>{x.clearRect(0,0,W,H);hs.forEach((h,i)=>{h.y-=h.v;h.w+=.02;if(h.y<-40)hs[i]=make();heart(h)});if(hs.length>60)hs.splice(0,hs.length-60);if(!reduce)requestAnimationFrame(tick)};
+  tick();
+  document.getElementById('openBtn').addEventListener('click',e=>{
+    document.getElementById('surprise').hidden=false;
+    e.target.textContent='আবারও ভালোবাসি ♥';
+    for(let i=0;i<30;i++)hs.push(make(H*(.5+Math.random()*.5),true));
+    if(reduce)tick();
+  });
+})();
+</script>
+</body>
+</html>
