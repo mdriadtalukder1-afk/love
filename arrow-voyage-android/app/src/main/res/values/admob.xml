@@ -1,12 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
   ===== AdMob IDs: the ONLY place to change them =====
-  These are Google's official TEST IDs (safe to click, never pay). Before publishing,
-  replace all three with your own from https://apps.admob.com (see README, section "AdMob").
+  These are the REAL Arrow Voyage IDs from https://apps.admob.com. Never tap your own live ads:
+  for testing on your phone, add it under AdMob → Settings → Test devices (see README, section "AdMob").
+  Google's test IDs, if ever needed again: app ca-app-pub-3940256099942544~3347511713,
+  interstitial ca-app-pub-3940256099942544/1033173712, rewarded ca-app-pub-3940256099942544/5224354917.
   app id uses "~", ad unit ids use "/".
 -->
 <resources>
-    <string name="admob_app_id" translatable="false">ca-app-pub-3940256099942544~3347511713</string>
-    <string name="admob_interstitial_id" translatable="false">ca-app-pub-3940256099942544/1033173712</string>
-    <string name="admob_rewarded_id" translatable="false">ca-app-pub-3940256099942544/5224354917</string>
+    <string name="admob_app_id" translatable="false">ca-app-pub-7655816735843132~4457758283</string>
+    <string name="admob_interstitial_id" translatable="false">ca-app-pub-7655816735843132/5387696575</string>
+    <string name="admob_rewarded_id" translatable="false">ca-app-pub-7655816735843132/8013859918</string>
 </resources>
