@@ -2,7 +2,7 @@
 
 এই ফোল্ডারটা একটা সম্পূর্ণ Android Studio প্রজেক্ট। গেমটা `app/src/main/assets/www/` এ offline আছে (fonts সহ), আর একটা ছোট Kotlin WebView wrapper (`MainActivity.kt`) সেটা full-screen এ চালায়। গেম নিজে offline চলে; INTERNET permission শুধু AdMob ad এর জন্য (`Ads.kt`)।
 
-Package name: `com.arrowvoyage.game` · versionCode 2 · versionName 1.1.0 · minSdk 24 (Android 7) · targetSdk 35
+Package name: `com.arrowvoyage.game` · versionCode 3 · versionName 1.2.0 · minSdk 24 (Android 7) · targetSdk 35
 
 ## 1. যা লাগবে (একবার)
 1. **Android Studio** (সর্বশেষ): https://developer.android.com/studio — install করার সময় Android SDK আর SDK Platform 35 সাথে নেয়।
@@ -36,7 +36,7 @@ Phone এ test করতে চাইলে: Android Studio এ Run ▶ (debug b
 - Browser এ (web version) কোনো ad নেই; সব ad call চুপচাপ কিছু করে না।
 
 ### ⚠️ ID বদলানোর জায়গা: শুধু একটা ফাইল
-**`app/src/main/res/values/admob.xml`** — এখানে এখন Google এর **test ID** বসানো আছে (test ad দেখায়, ক্লিক করলেও সমস্যা নেই, কিন্তু টাকা আসে না)। Publish এর আগে তিনটা লাইনই নিজের ID দিয়ে বদলাও:
+**`app/src/main/res/values/admob.xml`** — এখানে এখন Arrow Voyage এর **আসল AdMob ID** বসানো আছে (version 1.2.0 থেকে)। ID বদলাতে হলে এই তিনটা লাইন বদলাও:
 - `admob_app_id` → তোমার App ID (`ca-app-pub-xxxxxxxxxxxxxxxx~yyyyyyyyyy`, মাঝে `~`)
 - `admob_interstitial_id` → Interstitial ad unit ID (মাঝে `/`)
 - `admob_rewarded_id` → Rewarded ad unit ID (মাঝে `/`)
