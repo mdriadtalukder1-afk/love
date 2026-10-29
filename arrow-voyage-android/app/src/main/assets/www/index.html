@@ -1,0 +1,1128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b0f1f">
+<style>
+@font-face { font-family: "Sora"; src: url("fonts/Sora.woff2") format("woff2"); font-weight: 100 800; font-display: swap; }
+@font-face { font-family: "Manrope"; src: url("fonts/Manrope.woff2") format("woff2"); font-weight: 200 800; font-display: swap; }
+</style>
+<title>Arrow Voyage</title>
+<style>
+/* Layout: one-screen app. Home = hero orb, two mode tiles, gallery strip, level path, Play. Game = glass HUD (back, level + progress, energy cells, restart), full-height board, glass dock (levels, zoom, hint). */
+:root {
+  --bg: #0b0f1f; --bg2: #141a33; --glass: rgba(255, 255, 255, .07); --glass2: rgba(255, 255, 255, .12); --line: rgba(255, 255, 255, .14);
+  --ink: #eef1ff; --muted: #8b93b8; --accent: #35e0c4; --accent2: #8c6cff; --accent-ink: #051410;
+  --gold: #ffcf5a; --glow: #ffe28a; --bad: #ff5c7a; --sil: rgba(255, 255, 255, .055); --sil-line: rgba(255, 255, 255, .0);
+  --arrow: #e9edff; --a1: #35e0c4; --a2: #8c6cff; --a3: #ff6ec7; --shadow: 0 14px 40px rgba(0, 0, 0, .45);
+  --display: "Sora", "Manrope", system-ui, sans-serif; --font: "Manrope", system-ui, -apple-system, "Segoe UI", sans-serif; color-scheme: dark;
+}
+:root[data-skin="dusk"] {
+  --bg: #170c24; --bg2: #2a1340; --accent: #ff8a5c; --accent2: #c94bff; --accent-ink: #1d0a05; --a1: #ff8a5c; --a2: #c94bff; --a3: #ffd166; --muted: #a58bb8;
+}
+:root[data-skin="mint"] {
+  --bg: #eef4f6; --bg2: #d9e7ec; --glass: rgba(255, 255, 255, .62); --glass2: rgba(255, 255, 255, .85); --line: rgba(20, 40, 60, .1);
+  --ink: #0f1b2d; --muted: #5f6f86; --accent: #0fa58a; --accent2: #5b5bff; --accent-ink: #f2fffb; --gold: #f3b53a; --glow: #ffd97a; --bad: #e8445f;
+  --sil: rgba(15, 27, 45, .06); --arrow: #152238; --a1: #0fa58a; --a2: #5b5bff; --a3: #ff4fa3; --shadow: 0 14px 40px rgba(15, 27, 45, .14); color-scheme: light;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]):not([data-skin]) { color-scheme: dark; }
+}
+[hidden] { display: none !important; }
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px;
+  -webkit-tap-highlight-color: transparent; user-select: none; -webkit-user-select: none; overflow: hidden; transition: background .3s;
+}
+/* aurora: two drifting color fields plus a faint dot grid so the dark isn't flat */
+body::before {
+  content: ""; position: fixed; inset: -20%; z-index: 0; pointer-events: none;
+  background: radial-gradient(40% 35% at 20% 20%, color-mix(in srgb, var(--a2) 45%, transparent), transparent 70%),
+    radial-gradient(45% 40% at 85% 30%, color-mix(in srgb, var(--a1) 35%, transparent), transparent 70%),
+    radial-gradient(40% 40% at 60% 95%, color-mix(in srgb, var(--a3) 30%, transparent), transparent 70%);
+  filter: blur(30px); animation: drift 18s ease-in-out infinite alternate;
+}
+@keyframes drift { to { transform: translate(4%, -3%) rotate(3deg) scale(1.08); } }
+body::after {
+  content: ""; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 1.5px) 0 0 / 22px 22px,
+    linear-gradient(180deg, transparent 60%, color-mix(in srgb, var(--bg) 70%, transparent));
+}
+button { font: inherit; color: inherit; cursor: pointer; background: none; border: 0; padding: 0; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 14px; }
+.app {
+  position: relative; z-index: 1; height: 100%; display: flex; flex-direction: column; max-width: 620px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 10px;
+}
+.screen { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.glass { background: var(--glass); border: 1px solid var(--line); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.icon { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 14px; position: relative; flex: none; color: var(--ink); }
+.icon svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.icon:active { transform: scale(.92); }
+
+/* ---------- home ---------- */
+.top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pill { display: flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 14px 6px 10px; font-weight: 800; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pill svg { width: 18px; height: 18px; fill: var(--gold); }
+.hero { display: grid; justify-items: center; padding: 18px 0 8px; text-align: center; }
+.orb { width: 108px; height: 108px; border-radius: 50%; display: grid; place-items: center; position: relative;
+  background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--accent) 70%, #fff), var(--accent) 40%, var(--accent2) 100%);
+  box-shadow: 0 0 0 10px color-mix(in srgb, var(--accent) 12%, transparent), 0 20px 50px color-mix(in srgb, var(--accent2) 45%, transparent); animation: float 5s ease-in-out infinite; }
+@keyframes float { 50% { transform: translateY(-6px); } }
+.orb svg { width: 64px; height: 64px; }
+.hero h1 { margin: 18px 0 0; font-family: var(--display); font-weight: 800; font-size: clamp(30px, 8.5vw, 42px); letter-spacing: -1px; line-height: 1; }
+.hero h1 em { font-style: normal; background: linear-gradient(90deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero p { margin: 8px 0 0; color: var(--muted); font-weight: 700; font-size: 13px; letter-spacing: 2.5px; text-transform: uppercase; }
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+.tile { border-radius: 22px; padding: 16px; text-align: left; display: flex; flex-direction: column; gap: 3px; min-height: 140px; position: relative; overflow: hidden; }
+.tile::before { content: ""; position: absolute; inset: 0; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%); pointer-events: none; }
+.tile.alt::before { background: linear-gradient(135deg, color-mix(in srgb, var(--accent2) 26%, transparent), transparent 60%); }
+.tile b { font-family: var(--display); font-size: 17px; font-weight: 700; line-height: 1.15; }
+.tile span { font-size: 12.5px; color: var(--muted); font-weight: 700; }
+.tile .art { flex: 1; display: flex; align-items: flex-end; justify-content: flex-end; }
+.tile .art svg { width: 44px; height: 44px; fill: none; stroke: var(--accent); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.tile.alt .art svg { stroke: var(--accent2); }
+.tile .go { position: absolute; left: 16px; bottom: 14px; font-weight: 800; font-size: 13px; color: var(--accent); }
+.tile.alt .go { color: var(--accent2); }
+.tile.done .go { color: var(--muted); }
+.gallery { margin-top: 12px; border-radius: 20px; padding: 12px 14px; }
+.gallery .gh { display: flex; justify-content: space-between; align-items: center; font-weight: 800; color: var(--muted); font-size: 12px; letter-spacing: 2px; text-transform: uppercase; }
+.gallery .gh button { color: var(--accent); font-weight: 800; letter-spacing: 0; text-transform: none; font-size: 13px; }
+.strip { display: flex; gap: 10px; overflow-x: auto; padding: 10px 2px 2px; scrollbar-width: none; }
+.strip::-webkit-scrollbar { display: none; }
+.thumb { flex: none; width: 58px; height: 68px; border-radius: 14px; background: var(--glass2); border: 1px solid var(--line); display: grid; place-items: center; position: relative; }
+.thumb svg { width: 44px; height: 54px; }
+.thumb.locked svg { opacity: .14; }
+.thumb .q { position: absolute; font-family: var(--display); font-size: 20px; color: var(--muted); font-weight: 700; }
+.spacer { flex: 1; min-height: 8px; }
+.path { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 10px 0 16px; position: relative; }
+.path::before { content: ""; position: absolute; left: 10%; right: 10%; top: 50%; height: 2px; margin-top: -1px; background: linear-gradient(90deg, transparent, var(--line) 20%, var(--line) 80%, transparent); }
+.node {
+  position: relative; width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; font-family: var(--display);
+  background: var(--glass2); border: 1px solid var(--line); color: var(--ink); font-weight: 700; font-size: 15px; backdrop-filter: blur(10px);
+}
+.node.boss { border-color: var(--bad); color: var(--bad); }
+.node.cur { width: 56px; height: 56px; font-size: 20px; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--accent-ink); border: 0; box-shadow: 0 10px 30px color-mix(in srgb, var(--accent) 45%, transparent); }
+.node.done { opacity: .5; }
+.node.locked { opacity: .35; }
+.play {
+  background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--accent-ink); border-radius: 20px; padding: 14px 0 12px;
+  display: grid; justify-items: center; line-height: 1.15; box-shadow: 0 14px 40px color-mix(in srgb, var(--accent2) 45%, transparent); margin-bottom: 4px; position: relative; overflow: hidden;
+}
+.play::after { content: ""; position: absolute; inset: 0; background: linear-gradient(120deg, transparent 30%, rgba(255, 255, 255, .35) 50%, transparent 70%); transform: translateX(-120%); animation: shine 4s ease-in-out infinite; }
+@keyframes shine { 30%, 100% { transform: translateX(120%); } }
+.play b { font-family: var(--display); font-size: 24px; font-weight: 800; letter-spacing: 1px; }
+.play span { font-size: 13px; opacity: .8; font-weight: 800; }
+.play:active { transform: scale(.985); }
+
+/* ---------- game ---------- */
+.hud { display: flex; align-items: center; gap: 6px; border-radius: 20px; padding: 6px; }
+.hud .mid { flex: 1; min-width: 0; display: grid; gap: 5px; padding: 0 4px; }
+.hud .title { font-family: var(--display); font-weight: 700; font-size: 16px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; white-space: nowrap; min-width: 0; }
+.hud .title span { overflow: hidden; text-overflow: ellipsis; }
+.hud .title small { font-family: var(--font); font-size: 12px; font-weight: 800; color: var(--muted); font-variant-numeric: tabular-nums; }
+.prog { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.prog i { display: block; height: 100%; width: 0; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .35s cubic-bezier(.2, .8, .2, 1); box-shadow: 0 0 10px var(--accent); }
+.cells { display: flex; gap: 5px; padding: 0 6px; }
+.cells i { display: block; width: 12px; height: 26px; border-radius: 6px; background: linear-gradient(180deg, var(--accent), var(--accent2)); box-shadow: 0 0 10px color-mix(in srgb, var(--accent) 60%, transparent); transition: opacity .3s, transform .3s; }
+.cells i.gone { opacity: .18; box-shadow: none; background: var(--muted); }
+.cells i.pop { animation: cellIn .45s cubic-bezier(.2, .9, .3, 1.5) both; }
+.cells i.fall { animation: cellOut .55s ease-in forwards; }
+@keyframes cellIn { from { transform: scaleY(0); } }
+@keyframes cellOut { 30% { transform: scale(1.3); background: var(--bad); box-shadow: 0 0 16px var(--bad); } to { transform: scale(.4); opacity: .18; } }
+.stage { flex: 1; min-height: 0; position: relative; overflow: hidden; touch-action: none; margin: 8px 0; }
+.zoom { position: absolute; inset: 0; display: grid; place-items: center; transform-origin: 0 0; }
+.board { position: relative; transform-origin: 50% 50%; }
+.board.shake { animation: shake .28s; }
+@keyframes shake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+.board svg, .board canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.board canvas { pointer-events: none; }
+.sil rect { fill: var(--sil); transition: fill .6s; }
+.sil.reveal rect { fill: color-mix(in srgb, var(--gold) 70%, var(--bg)); }
+.sn path { fill: none; stroke: var(--arrow); stroke-linecap: butt; stroke-linejoin: miter; stroke-width: var(--sw, 1.6); }
+.sn polygon { fill: var(--arrow); }
+.sn.fly path { stroke: var(--gold); } .sn.fly polygon { fill: var(--gold); }
+.sn.fly { filter: drop-shadow(0 0 2px var(--glow)) drop-shadow(0 0 6px var(--glow)); }
+.sn.bad path { stroke: var(--bad); } .sn.bad polygon { fill: var(--bad); }
+.sn.hint path { stroke: var(--accent); animation: blink .7s ease-in-out infinite; } .sn.hint polygon { fill: var(--accent); }
+.sn.hint { filter: drop-shadow(0 0 4px var(--accent)); }
+@keyframes blink { 50% { opacity: .35; } }
+.banner {
+  position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 4; pointer-events: none;
+  border-radius: 18px; padding: 12px 24px; text-align: center; line-height: 1.25; box-shadow: var(--shadow); font-size: 15px; white-space: nowrap; font-weight: 800; color: var(--muted);
+}
+.banner b { display: block; color: var(--ink); font-family: var(--display); font-size: 22px; font-weight: 800; }
+.combo { position: absolute; left: 50%; top: 4px; transform: translateX(-50%); font-family: var(--display); font-weight: 800; color: var(--gold); font-size: 22px; pointer-events: none; opacity: 0; z-index: 5; text-shadow: 0 0 14px var(--glow); }
+.dock { display: flex; justify-content: space-between; align-items: center; border-radius: 22px; padding: 6px; gap: 4px; }
+.dock button { width: 50px; height: 50px; border-radius: 16px; display: grid; place-items: center; color: var(--ink); position: relative; }
+.dock button:active { transform: scale(.9); }
+.dock .zoomgrp { display: flex; align-items: center; gap: 2px; border-radius: 16px; background: var(--glass); }
+.dock .zoomgrp button { width: 46px; }
+.dock .zl { font-size: 11px; font-weight: 800; color: var(--muted); min-width: 34px; text-align: center; font-variant-numeric: tabular-nums; }
+.dock svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.dock .hint { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--accent-ink); box-shadow: 0 8px 24px color-mix(in srgb, var(--accent) 40%, transparent); }
+.dock .badge { position: absolute; top: -6px; right: -6px; min-width: 22px; height: 22px; border-radius: 11px; padding: 0 6px; background: var(--ink); color: var(--bg); font-size: 12px; font-weight: 800; line-height: 22px; text-align: center; }
+
+/* ---------- overlay ---------- */
+.overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 20px; z-index: 20; background: color-mix(in srgb, var(--bg) 65%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
+.sheet {
+  width: min(380px, 100%); background: color-mix(in srgb, var(--bg2) 92%, #fff); border: 1px solid var(--line); border-radius: 28px; box-shadow: var(--shadow);
+  padding: 24px 20px; text-align: center; display: grid; gap: 12px; animation: rise .4s cubic-bezier(.2, .9, .3, 1.25); max-height: calc(100% - 20px);
+}
+@keyframes rise { from { transform: translateY(30px) scale(.92); opacity: 0; } }
+.sheet h2 { margin: 0; font-family: var(--display); font-size: 26px; font-weight: 800; line-height: 1.1; letter-spacing: -.5px; }
+.sheet p { margin: 0; color: var(--muted); font-weight: 700; font-size: 14px; }
+.stars { display: flex; justify-content: center; align-items: flex-end; gap: 6px; height: 72px; }
+.stars svg { width: 50px; height: 50px; fill: var(--line); }
+.stars svg:nth-child(2) { width: 66px; height: 66px; margin-bottom: 8px; }
+.stars svg.on { fill: var(--gold); animation: pop .5s cubic-bezier(.2, .9, .3, 1.6) both; filter: drop-shadow(0 0 10px var(--glow)); }
+.stars svg.on:nth-child(2) { animation-delay: .18s; } .stars svg.on:nth-child(3) { animation-delay: .36s; }
+@keyframes pop { from { transform: scale(0) rotate(-60deg); } }
+.pic { display: grid; place-items: center; }
+.pic svg { width: 100px; height: 120px; filter: drop-shadow(0 0 18px color-mix(in srgb, var(--gold) 60%, transparent)); }
+.row { display: flex; gap: 10px; }
+.btn { flex: 1; border-radius: 16px; padding: 13px 0; font-weight: 800; font-size: 16px; background: var(--glass2); border: 1px solid var(--line); }
+.btn.primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: var(--accent-ink); border: 0; }
+.grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; max-height: 46vh; overflow-y: auto; padding: 4px; }
+.grid button { aspect-ratio: 1; border-radius: 14px; background: var(--glass2); border: 1px solid var(--line); font-family: var(--display); font-weight: 700; font-size: 15px; }
+.grid button.boss { border-color: var(--bad); color: var(--bad); }
+.grid button.locked { opacity: .3; cursor: default; }
+.grid button.star { border-color: var(--gold); color: var(--gold); box-shadow: 0 0 10px color-mix(in srgb, var(--gold) 40%, transparent); }
+.pgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-height: 50vh; overflow-y: auto; padding: 4px; }
+.pgrid .thumb { width: auto; height: auto; aspect-ratio: 56 / 66; }
+.pgrid .thumb svg { width: 80%; height: 80%; }
+.pgrid small { display: block; font-size: 11px; font-weight: 800; color: var(--muted); margin-top: 3px; }
+.toggle { display: flex; justify-content: space-between; align-items: center; padding: 10px 4px; border-bottom: 1px solid var(--line); font-weight: 800; }
+.toggle:last-of-type { border-bottom: 0; }
+.sw { width: 50px; height: 30px; border-radius: 15px; background: var(--line); position: relative; transition: background .2s; }
+.sw::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .25); transition: transform .2s; }
+.sw.on { background: var(--accent); } .sw.on::after { transform: translateX(20px); }
+.skins { display: flex; gap: 8px; }
+.skins button { width: 32px; height: 32px; border-radius: 50%; border: 3px solid transparent; box-shadow: 0 0 0 1px var(--line); }
+.skins button.on { border-color: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="screen" id="home">
+    <div class="top">
+      <div class="pill glass" aria-label="Hints"><svg viewBox="0 0 24 24"><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V18h6v-1.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2zM9 20h6v2H9z"/></svg><span id="homeHints">5</span></div>
+      <button class="icon glass" id="homeSettings" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2.5"/><circle cx="10" cy="17" r="2.5"/></svg></button>
+    </div>
+    <div class="hero">
+      <div class="orb"><svg viewBox="0 0 64 64" aria-hidden="true">
+        <path d="M16 46V30h14V18h10" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="butt" stroke-linejoin="miter"/>
+        <path d="M36 10l11 8-11 8z" fill="#fff"/><path d="M22 46h16" fill="none" stroke="#fff" stroke-width="5"/><path d="M36 38l11 8-11 8z" fill="#fff"/></svg></div>
+      <h1>Arrow <em>Voyage</em></h1><p>Only one can fly</p>
+    </div>
+    <div class="tiles">
+      <button class="tile glass" id="dailyCard">
+        <b>Daily<br>Challenge</b><span id="dailyDate"></span>
+        <div class="art"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M9 15l2 2 4-4"/></svg></div>
+        <div class="go" id="dailyGo">Start →</div>
+      </button>
+      <button class="tile glass alt" id="allCard">
+        <b>All<br>Levels</b><span id="allSub"></span>
+        <div class="art"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="2"/><rect x="14" y="3" width="7" height="7" rx="2"/><rect x="3" y="14" width="7" height="7" rx="2"/><path d="M14 17.5h7M17.5 14v7"/></svg></div>
+        <div class="go">Open →</div>
+      </button>
+    </div>
+    <div class="gallery glass">
+      <div class="gh"><span>Picture gallery</span><button id="galleryBtn">See all</button></div>
+      <div class="strip" id="strip"></div>
+    </div>
+    <div class="spacer"></div>
+    <div class="path" id="path"></div>
+    <button class="play" id="playBtn"><b>PLAY</b><span id="playSub">Level 1</span></button>
+  </section>
+
+  <section class="screen" id="game" hidden>
+    <div class="hud glass">
+      <button class="icon" id="backBtn" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="mid">
+        <div class="title"><span id="lvTitle">Level 1</span><small id="foot"></small></div>
+        <div class="prog"><i id="prog"></i></div>
+      </div>
+      <div class="cells" id="drops" aria-label="Lives"></div>
+      <button class="icon" id="skinBtn" aria-label="Change colors"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none"/></svg></button>
+      <button class="icon" id="restartBtn" aria-label="Restart"><svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4h4"/></svg></button>
+    </div>
+    <div class="stage" id="stage">
+      <div class="zoom" id="zoom"><div class="board" id="board"><svg id="svg"></svg><canvas id="fx"></canvas></div></div>
+      <div class="banner glass" id="banner" hidden></div>
+      <div class="combo" id="combo"></div>
+    </div>
+    <div class="dock glass">
+      <button id="levelsBtn" aria-label="Levels"><svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><path d="M3.5 9.2h17M3.5 14.8h17M9.2 3.5v17M14.8 3.5v17"/></svg></button>
+      <div class="zoomgrp">
+        <button id="zOut" aria-label="Zoom out"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8M7.5 10.5h6"/></svg></button>
+        <button id="zFit" aria-label="Fit board"><span class="zl" id="zLevel">1×</span></button>
+        <button id="zIn" aria-label="Zoom in"><svg viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M20 20l-4.8-4.8M7.5 10.5h6M10.5 7.5v6"/></svg></button>
+      </div>
+      <button class="hint" id="hintBtn" aria-label="Hint"><svg viewBox="0 0 24 24"><path d="M9.5 18.5h5M10.5 21h3"/><path d="M12 3a6.2 6.2 0 0 0-3.6 11.2c.6.5 1 1.2 1 2v.3h5.2v-.3c0-.8.4-1.5 1-2A6.2 6.2 0 0 0 12 3z"/></svg><span class="badge" id="hintCount">5</span></button>
+    </div>
+  </section>
+</div>
+<div class="overlay" id="overlay" hidden></div>
+<script>
+// GEN-START
+const DIRS = [[0, -1], [1, 0], [0, 1], [-1, 0]]; // up, right, down, left
+
+function rng(seed) {
+  return function () {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// ---- pictures: each is a test on (u, v) in a 1 : 1.2 box, u across, v down ----
+const ell = (u, v, cx, cy, rx, ry) => ((u - cx) / rx) ** 2 + ((v - cy) / ry) ** 2 <= 1;
+const box = (u, v, x0, y0, x1, y1) => u >= x0 && u <= x1 && v >= y0 && v <= y1;
+function poly(u, v, p) {
+  let inside = false;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+    const [xi, yi] = p[i], [xj, yj] = p[j];
+    if ((yi > v) !== (yj > v) && u < (xj - xi) * (v - yi) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+const starPts = (() => { const p = []; for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, r = i % 2 ? 0.2 : 0.5; p.push([0.5 + Math.cos(a) * r, 0.54 + Math.sin(a) * r * 0.92]); } return p; })();
+const SHAPES = [
+  { name: "Heart", f: (u, v) => { const x = (u - 0.5) * 2.4, y = 1.2 - v * 2.3; return (x * x + y * y - 1) ** 3 - x * x * y ** 3 <= 0; } },
+  { name: "Trophy", f: (u, v) => poly(u, v, [[0.2, 0.06], [0.8, 0.06], [0.74, 0.36], [0.6, 0.5], [0.4, 0.5], [0.26, 0.36]]) ||
+      ((ell(u, v, 0.2, 0.2, 0.16, 0.15) && !ell(u, v, 0.2, 0.2, 0.07, 0.07) && u < 0.26) || (ell(u, v, 0.8, 0.2, 0.16, 0.15) && !ell(u, v, 0.8, 0.2, 0.07, 0.07) && u > 0.74)) ||
+      box(u, v, 0.43, 0.5, 0.57, 0.72) || box(u, v, 0.3, 0.72, 0.7, 0.8) || box(u, v, 0.2, 0.8, 0.8, 0.92) },
+  { name: "Anchor", f: (u, v) => (ell(u, v, 0.5, 0.11, 0.11, 0.09) && !ell(u, v, 0.5, 0.11, 0.045, 0.04)) || box(u, v, 0.44, 0.19, 0.56, 0.92) ||
+      box(u, v, 0.22, 0.27, 0.78, 0.35) || (ell(u, v, 0.5, 0.55, 0.44, 0.4) && !ell(u, v, 0.5, 0.55, 0.32, 0.29) && v > 0.62) ||
+      poly(u, v, [[0.0, 0.66], [0.2, 0.66], [0.1, 0.5]]) || poly(u, v, [[0.8, 0.66], [1.0, 0.66], [0.9, 0.5]]) },
+  { name: "Butterfly", f: (u, v) => ell(u, v, 0.26, 0.3, 0.25, 0.24) || ell(u, v, 0.74, 0.3, 0.25, 0.24) || ell(u, v, 0.3, 0.7, 0.2, 0.2) || ell(u, v, 0.7, 0.7, 0.2, 0.2) || box(u, v, 0.45, 0.14, 0.55, 0.9) },
+  { name: "Fish", f: (u, v) => (ell(u, v, 0.42, 0.52, 0.36, 0.27) || poly(u, v, [[0.68, 0.52], [0.98, 0.26], [0.98, 0.78]]) || poly(u, v, [[0.32, 0.3], [0.52, 0.1], [0.58, 0.3]])) && !ell(u, v, 0.22, 0.46, 0.045, 0.04) },
+  { name: "Tree", f: (u, v) => poly(u, v, [[0.5, 0.0], [0.8, 0.3], [0.2, 0.3]]) || poly(u, v, [[0.5, 0.16], [0.88, 0.52], [0.12, 0.52]]) || poly(u, v, [[0.5, 0.36], [0.98, 0.78], [0.02, 0.78]]) || box(u, v, 0.41, 0.78, 0.59, 0.98) },
+  { name: "House", f: (u, v) => (box(u, v, 0.12, 0.44, 0.88, 0.96) || poly(u, v, [[0.5, 0.04], [1.0, 0.48], [0.0, 0.48]]) || box(u, v, 0.68, 0.08, 0.8, 0.3)) && !box(u, v, 0.42, 0.72, 0.58, 0.96) && !box(u, v, 0.2, 0.56, 0.32, 0.66) && !box(u, v, 0.68, 0.56, 0.8, 0.66) },
+  { name: "Star", f: (u, v) => poly(u, v, starPts) },
+  { name: "Cat", f: (u, v) => ell(u, v, 0.34, 0.26, 0.2, 0.16) || poly(u, v, [[0.16, 0.2], [0.17, 0.02], [0.31, 0.13]]) || poly(u, v, [[0.37, 0.13], [0.51, 0.02], [0.52, 0.2]]) ||
+      ell(u, v, 0.47, 0.66, 0.3, 0.31) || box(u, v, 0.7, 0.86, 0.97, 0.95) || box(u, v, 0.88, 0.55, 0.97, 0.95) },
+  { name: "Rocket", f: (u, v) => (ell(u, v, 0.5, 0.46, 0.21, 0.44) || poly(u, v, [[0.32, 0.58], [0.1, 0.9], [0.34, 0.82]]) || poly(u, v, [[0.68, 0.58], [0.9, 0.9], [0.66, 0.82]]) || poly(u, v, [[0.4, 0.86], [0.5, 1.0], [0.6, 0.86]])) && !ell(u, v, 0.5, 0.36, 0.07, 0.06) },
+  { name: "Crown", f: (u, v) => poly(u, v, [[0.04, 0.2], [0.27, 0.5], [0.5, 0.1], [0.73, 0.5], [0.96, 0.2], [0.87, 0.8], [0.13, 0.8]]) || box(u, v, 0.13, 0.8, 0.87, 0.94) },
+  { name: "Mushroom", f: (u, v) => (ell(u, v, 0.5, 0.44, 0.48, 0.38) && v < 0.5) || box(u, v, 0.35, 0.5, 0.65, 0.94) },
+  { name: "Gem", f: (u, v) => poly(u, v, [[0.2, 0.1], [0.8, 0.1], [1.0, 0.36], [0.5, 0.96], [0.0, 0.36]]) },
+  { name: "Moon", f: (u, v) => ell(u, v, 0.48, 0.5, 0.46, 0.42) && !ell(u, v, 0.72, 0.4, 0.38, 0.34) },
+  { name: "Umbrella", f: (u, v) => (ell(u, v, 0.5, 0.46, 0.5, 0.42) && v < 0.46) || box(u, v, 0.45, 0.46, 0.55, 0.88) || (ell(u, v, 0.36, 0.86, 0.14, 0.11) && !ell(u, v, 0.36, 0.86, 0.05, 0.03) && v > 0.86) },
+  { name: "Bell", f: (u, v) => poly(u, v, [[0.36, 0.12], [0.64, 0.12], [0.76, 0.3], [0.8, 0.66], [0.96, 0.82], [0.04, 0.82], [0.2, 0.66], [0.24, 0.3]]) || ell(u, v, 0.5, 0.08, 0.08, 0.07) || ell(u, v, 0.5, 0.9, 0.1, 0.08) }
+];
+const GRAND = { name: "Grand Maze", f: () => true };
+
+function levelSpec(n) {
+  const boss = n % 10 === 0, relief = n % 10 === 7;
+  const W = Math.min(13 + Math.floor(n * 0.4), 24) + (boss ? 2 : 0) - (relief ? 3 : 0);
+  const H = Math.round(W * 1.2);
+  // the most arrows that may be free at once while you play; 1 means you always hunt for the single one
+  const maxFree = n <= 2 ? 4 : n <= 5 ? 3 : n <= 9 ? 2 : relief ? 3 : 1;
+  const maxLen = Math.min(4 + Math.floor(n / 3), 14);
+  const shape = boss ? GRAND : SHAPES[(n - 1 - Math.floor(n / 10)) % SHAPES.length];
+  return { n, W, H, maxFree, maxLen, minLen: 2, shape, boss, relief };
+}
+
+function maskFor(spec) {
+  const { W, H } = spec, m = new Uint8Array(W * H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) m[y * W + x] = spec.shape.f((x + 0.5) / W, (y + 0.5) / H) ? 1 : 0;
+  return m;
+}
+
+// Snakes (arrows) are placed one by one; each new one gets a clear straight run from its head to the edge,
+// so clearing them newest-first always works. Every new snake is laid across the runs of the snakes that
+// are currently free, which shuts them in: at every moment of play only a handful (often just one) can fly.
+function buildBoard(spec, seed) {
+  const r = rng(seed), { W, H } = spec, mask = maskFor(spec);
+  const grid = new Int16Array(W * H).fill(-1);
+  const lastRay = new Int16Array(W * H).fill(-1);
+  const snakes = [];
+  let filled = 0; const cells = mask.reduce((a, v) => a + v, 0);
+  let free = []; // snakes free right now (in build order: the ones a player could tap first)
+  const inside = (x, y) => x >= 0 && y >= 0 && x < W && y < H;
+  const open = i => mask[i] && grid[i] < 0;
+  const ray = (i, d) => {
+    const out = [];
+    for (let x = i % W + DIRS[d][0], y = ((i / W) | 0) + DIRS[d][1]; inside(x, y); x += DIRS[d][0], y += DIRS[d][1]) out.push(y * W + x);
+    return out;
+  };
+  const nbs = i => {
+    const x = i % W, y = (i / W) | 0, out = [];
+    for (const [dx, dy] of DIRS) if (inside(x + dx, y + dy)) out.push((y + dy) * W + x + dx);
+    return out;
+  };
+  const openCount = i => nbs(i).filter(open).length;
+  const dirOf = (from, to) => { const dx = to % W - from % W, dy = ((to / W) | 0) - ((from / W) | 0); return DIRS.findIndex(([a, b]) => a === dx && b === dy); };
+
+  // Candidate: a head with a clear run, then a body grown backwards from its neck that winds through the
+  // runs of the currently free snakes (shortest detours found by BFS), so placing it shuts them in.
+  function grow(h, d) {
+    const ry = ray(h, d), banned = new Set(ry);
+    const neck = h - DIRS[d][0] - DIRS[d][1] * W;
+    const body = [neck, h], used = new Set(body);
+    const order = free.slice().sort(() => r() - 0.5);
+    for (const f of order) {
+      if (snakes[f].ray.some(c => used.has(c))) continue;
+      const goal = new Set(snakes[f].ray.filter(open));
+      if (!goal.size) continue;
+      const prev = new Map([[body[0], -1]]), q = [body[0]];
+      let hit = -1;
+      for (let qi = 0; qi < q.length && hit < 0; qi++) {
+        for (const n of nbs(q[qi])) {
+          if (prev.has(n) || !open(n) || banned.has(n) || used.has(n)) continue;
+          prev.set(n, q[qi]); q.push(n);
+          if (goal.has(n)) { hit = n; break; }
+        }
+      }
+      if (hit < 0) continue;
+      const path = []; for (let c = hit; c !== body[0]; c = prev.get(c)) path.push(c); // hit ... next to tail
+      if (body.length + path.length > spec.maxLen * 3) continue;
+      for (let i = path.length - 1; i >= 0; i--) { body.unshift(path[i]); used.add(path[i]); }
+    }
+    // pad the tail a little so arrows have varied lengths
+    const want = spec.minLen + Math.floor(Math.pow(r(), 1.5) * (spec.maxLen - spec.minLen + 1));
+    while (body.length < want) {
+      const opts = nbs(body[0]).filter(c => open(c) && !banned.has(c) && !used.has(c));
+      if (!opts.length) break;
+      opts.sort((a, b) => openCount(a) - openCount(b));
+      const c = r() < 0.7 ? opts[0] : opts[(r() * opts.length) | 0];
+      body.unshift(c); used.add(c);
+    }
+    const blocked = free.filter(f => snakes[f].ray.some(c => used.has(c)));
+    return { cells: body, d, ray: ry, blocked };
+  }
+
+  for (;;) {
+    // heads near the runs of the free snakes (BFS distance over open cells), with a run of their own
+    const dist = new Int16Array(W * H).fill(-1), q = [];
+    for (const f of free) for (const c of snakes[f].ray) if (open(c)) { dist[c] = 0; q.push(c); }
+    for (let qi = 0; qi < q.length; qi++) for (const n of nbs(q[qi])) if (open(n) && dist[n] < 0) { dist[n] = dist[q[qi]] + 1; q.push(n); }
+    const heads = [], far = [];
+    for (let h = 0; h < W * H; h++) {
+      if (!open(h)) continue;
+      for (let d = 0; d < 4; d++) {
+        const nx = h % W - DIRS[d][0], ny = ((h / W) | 0) - DIRS[d][1];
+        if (!inside(nx, ny) || !open(ny * W + nx)) continue;
+        const ry = ray(h, d);
+        if (!ry.length || ry.some(c => grid[c] >= 0)) continue;
+        const blockable = ry.filter(open).length; // a run that leaves the picture at once can never be shut
+        (blockable && dist[h] >= 0 && dist[h] <= spec.maxLen + 2 ? heads : far).push([h, d, blockable]);
+      }
+    }
+    heads.sort((a, b) => dist[a[0]] - dist[b[0]]);
+    const pool = heads.length ? heads : far;
+    if (!pool.length) break;
+    let best = null;
+    for (let k = 0; k < 60; k++) {
+      const [h, d, blockable] = pool[(r() * r() * pool.length) | 0]; // pool is sorted nearest first
+      const c = grow(h, d);
+      const after = free.length + 1 - c.blocked.length;
+      const onRun = free.some(f => snakes[f].ray.includes(h)) ? 1 : 0; // a head sitting right on a run is easy to read
+      const score = -Math.max(after, 1) * 100 + Math.min(blockable, 4) * 6 - onRun * 8 - Math.abs(c.cells.length - 6) * 0.5 + r() * 4;
+      if (!best || score > best.score) best = { ...c, after, score };
+    }
+    // once the picture is mostly drawn, refuse arrows that would just add another free one
+    if (best.after > spec.maxFree && filled / cells > 0.5) break; // the rest is filled by growing tails
+    const id = snakes.length;
+    for (const c of best.cells) grid[c] = id;
+    for (const c of best.ray) lastRay[c] = id;
+    filled += best.cells.length;
+    snakes.push(best);
+    free = free.filter(f => !best.blocked.includes(f)).concat(id);
+  }
+  // fill leftover gaps by growing snakes backwards from their tails; a tail may only take a cell
+  // that no later snake's run crosses, so the clearing order still works
+  for (let changed = true; changed;) {
+    changed = false;
+    for (let c = 0; c < W * H; c++) {
+      if (!open(c)) continue;
+      for (const nb of nbs(c)) {
+        const i = grid[nb];
+        if (i >= 0 && snakes[i].cells[0] === nb && lastRay[c] < i) { snakes[i].cells.unshift(c); grid[c] = i; changed = true; break; }
+      }
+    }
+  }
+  return { snakes: snakes.map(s => ({ cells: s.cells.map(c => [c % W, (c / W) | 0]), d: s.d })), mask };
+}
+
+// Plays the board many ways: is it solvable, how many are free at the start, and how many on average while playing.
+function analyse(snakes, W, H, seed = 1) {
+  const r = rng(seed);
+  const owner = new Int16Array(W * H).fill(-1);
+  snakes.forEach((s, i) => s.cells.forEach(([x, y]) => owner[y * W + x] = i));
+  const alive = snakes.map(() => true);
+  const isFree = i => {
+    const s = snakes[i], [hx, hy] = s.cells[s.cells.length - 1], [dx, dy] = DIRS[s.d];
+    for (let x = hx + dx, y = hy + dy; x >= 0 && y >= 0 && x < W && y < H; x += dx, y += dy) { const o = owner[y * W + x]; if (o >= 0 && alive[o] && o !== i) return false; }
+    return true;
+  };
+  let left = snakes.length, first = -1, sum = 0, steps = 0, ones = 0;
+  while (left) {
+    const f = [];
+    for (let i = 0; i < snakes.length; i++) if (alive[i] && isFree(i)) f.push(i);
+    if (first < 0) first = f.length;
+    if (!f.length) return { ok: false, free: first };
+    sum += f.length; steps++; if (f.length === 1) ones++;
+    alive[f[(r() * f.length) | 0]] = false; left--;
+  }
+  return { ok: true, free: first, avgFree: sum / steps, single: ones / steps };
+}
+
+function makeBoard(spec, seedBase) {
+  let best = null;
+  const tries = spec.W > 22 ? 4 : 6;
+  for (let k = 0; k < tries; k++) {
+    const b = buildBoard(spec, seedBase + k * 104729);
+    const cells = b.mask.reduce((a, v) => a + v, 0);
+    const cover = b.snakes.reduce((a, s) => a + s.cells.length, 0) / cells;
+    const a = analyse(b.snakes, spec.W, spec.H, seedBase);
+    if (!a.ok) continue;
+    const score = cover * 60 - a.avgFree * 60 + a.single * 40;
+    if (!best || score > best.score) best = { score, ...b, cover, ...a };
+  }
+  return { ...spec, ...best };
+}
+const makeLevel = n => makeBoard(levelSpec(n), n * 7919);
+// GEN-END
+
+const LEVELS = 100;
+const NS = "http://www.w3.org/2000/svg";
+const PAD = 0.6, HEAD = 0.42;
+const $ = id => document.getElementById(id);
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const STAR = '<svg viewBox="0 0 24 24"><path d="M12 2.8l2.8 5.8 6.3.9-4.6 4.4 1.1 6.3L12 17.2l-5.6 3 1.1-6.3-4.6-4.4 6.3-.9z"/></svg>';
+const SKINS = [["aurora", "#0b0f1f"], ["dusk", "#170c24"], ["mint", "#eef4f6"]];
+const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem("arrow-voyage-3") || "null"); } catch (e) { return null; } },
+  set(v) { try { localStorage.setItem("arrow-voyage-3", JSON.stringify(v)); } catch (e) {} }
+};
+let save = Object.assign({ unlocked: 1, stars: {}, hints: 5, sound: true, haptics: true, skin: null, daily: null, pics: {} }, store.get() || {});
+if (save.skin && !SKINS.some(k => k[0] === save.skin)) save.skin = null;
+const persist = () => store.set(save);
+const applySkin = () => save.skin ? document.documentElement.setAttribute("data-skin", save.skin) : document.documentElement.removeAttribute("data-skin");
+applySkin();
+const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+// a picture as a small block of SVG rects (used in the gallery and on the win sheet)
+function picSvg(shape, cls) {
+  const W = 22, H = 26; let rects = "";
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (shape.f((x + 0.5) / W, (y + 0.5) / H)) rects += `<rect x="${x}" y="${y}" width="1.05" height="1.05"/>`;
+  return `<svg viewBox="0 0 ${W} ${H}" class="${cls || ""}"><g fill="currentColor">${rects}</g></svg>`;
+}
+
+// ================= sound =================
+// Small synth: every voice goes through a compressor; a feedback delay adds a little room so notes don't sound dry.
+let actx = null, noiseBuf = null, master = null, verb = null;
+function audio() {
+  if (!save.sound) return null;
+  try {
+    if (!actx) {
+      actx = new (window.AudioContext || window.webkitAudioContext)();
+      noiseBuf = actx.createBuffer(1, actx.sampleRate * 0.8, actx.sampleRate);
+      const ch = noiseBuf.getChannelData(0); for (let i = 0; i < ch.length; i++) ch[i] = Math.random() * 2 - 1;
+      master = actx.createDynamicsCompressor(); master.threshold.value = -18; master.ratio.value = 6; master.connect(actx.destination);
+      const dl = actx.createDelay(1), fb = actx.createGain(), lp = actx.createBiquadFilter(), wet = actx.createGain();
+      dl.delayTime.value = 0.23; fb.gain.value = 0.35; lp.type = "lowpass"; lp.frequency.value = 2800; wet.gain.value = 0.28;
+      dl.connect(lp).connect(fb).connect(dl); dl.connect(wet).connect(master); verb = dl;
+    }
+  } catch (e) { return null; }
+  if (actx.state === "suspended") actx.resume();
+  return actx;
+}
+function out(node, send) { node.connect(master); if (send && verb) { const g = actx.createGain(); g.gain.value = send; node.connect(g).connect(verb); } }
+function env(g, t, peak, attack, dur, curve) {
+  g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + attack);
+  if (curve === "hold") g.gain.setValueAtTime(peak, t + dur * 0.6);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+}
+function tone(freq, dur, type = "sine", vol = 0.15, to = 0, delay = 0, send = 0.4, attack = 0.008) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delay, o = a.createOscillator(), g = a.createGain();
+  o.type = type; o.frequency.setValueAtTime(freq, t);
+  if (to) o.frequency.exponentialRampToValueAtTime(to, t + dur);
+  env(g, t, vol, attack, dur);
+  o.connect(g); out(g, send); o.start(t); o.stop(t + dur + 0.05);
+}
+// a soft pluck: two detuned triangles through a closing lowpass
+function pluck(freq, dur, vol, delay = 0, send = 0.5) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delay, g = a.createGain(), f = a.createBiquadFilter();
+  f.type = "lowpass"; f.Q.value = 2; f.frequency.setValueAtTime(freq * 6, t); f.frequency.exponentialRampToValueAtTime(freq * 1.2, t + dur);
+  env(g, t, vol, 0.004, dur);
+  [0, 7].forEach(cents => { const o = a.createOscillator(); o.type = "triangle"; o.frequency.value = freq; o.detune.value = cents; o.connect(f); o.start(t); o.stop(t + dur + 0.05); });
+  f.connect(g); out(g, send);
+}
+function noise(dur, f0, f1, vol, q = 1.2, type = "bandpass", delay = 0, send = 0.2) {
+  const a = audio(); if (!a) return;
+  const t = a.currentTime + delay, s = a.createBufferSource(), f = a.createBiquadFilter(), g = a.createGain();
+  s.buffer = noiseBuf; f.type = type; f.Q.value = q;
+  f.frequency.setValueAtTime(f0, t); f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+  env(g, t, vol, dur * 0.25, dur);
+  s.connect(f).connect(g); out(g, send); s.start(t); s.stop(t + dur + 0.05);
+}
+const PENTA = [1047, 1175, 1319, 1568, 1760, 2093, 2349, 2637];
+const sfx = {
+  tap() { pluck(1400, 0.08, 0.05, 0, 0.1); },
+  whoosh(combo) {
+    const k = Math.min(combo, 12);
+    noise(0.38, 500, 5000, 0.2, 1.6, "bandpass", 0, 0.3);
+    tone(380 * Math.pow(1.0595, k * 2), 0.22, "sawtooth", 0.035, 1900 * Math.pow(1.0595, k * 2), 0, 0.5, 0.02);
+    pluck(PENTA[k % PENTA.length] / 2, 0.3, 0.12, 0.02);
+    for (let i = 0; i < 3; i++) pluck(PENTA[(k + i * 2) % PENTA.length], 0.22, 0.035, 0.07 + i * 0.06);
+  },
+  thud() { tone(140, 0.22, "sine", 0.4, 45, 0, 0.1); noise(0.14, 1200, 150, 0.14, 0.8, "lowpass", 0, 0); tone(220, 0.08, "square", 0.04, 90, 0, 0); },
+  drop() { tone(880, 0.16, "sine", 0.14, 330, 0.06, 0.5); tone(587, 0.22, "sine", 0.1, 220, 0.2, 0.6); },
+  start() { noise(0.8, 200, 2400, 0.07, 0.6, "bandpass", 0, 0.5); [392, 587, 784].forEach((f, i) => pluck(f, 0.5, 0.06, 0.1 + i * 0.1, 0.7)); },
+  reveal() { [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => pluck(f, 0.7, 0.09, i * 0.08, 0.8)); noise(1.2, 1500, 7000, 0.05, 0.5, "bandpass", 0.1, 0.6); },
+  win() {
+    [[523, 659, 784], [587, 740, 880], [659, 831, 988], [784, 1047, 1319]].forEach((ch, i) => ch.forEach(f => tone(f, 0.5, "triangle", 0.07, 0, i * 0.16, 0.6, 0.02)));
+    for (let i = 0; i < 12; i++) pluck(PENTA[(Math.random() * PENTA.length) | 0] * 2, 0.3, 0.03, 0.6 + i * 0.045, 0.8);
+  },
+  lose() { [392, 349, 311, 262].forEach((f, i) => tone(f, 0.45, "triangle", 0.1, f * 0.97, i * 0.16, 0.6, 0.03)); tone(131, 0.9, "sine", 0.12, 0, 0.55, 0.5, 0.05); },
+  hint() { [1319, 1760, 2093, 2637].forEach((f, i) => pluck(f, 0.3, 0.05, i * 0.06, 0.7)); }
+};
+const buzz = p => { if (!save.haptics) return; try { navigator.vibrate && navigator.vibrate(p); } catch (e) {} };
+
+// ================= effects canvas =================
+const fx = { parts: [], trails: [], running: false, ctx: null, cell: 1, dpr: 1 };
+function fxSize(w, h, cell) {
+  const c = $("fx"); fx.dpr = Math.min(2, window.devicePixelRatio || 1, Math.sqrt(12e6 / (w * h)));
+  c.width = Math.round(w * fx.dpr); c.height = Math.round(h * fx.dpr);
+  fx.ctx = c.getContext("2d"); fx.cell = cell;
+}
+const toPx = (x, y) => [(x + PAD) * fx.cell, (y + PAD) * fx.cell];
+function sparkle(x, y, n, spread, color) {
+  if (reduced) return;
+  for (let i = 0; i < n; i++) {
+    const a = Math.random() * Math.PI * 2, v = spread * (0.3 + Math.random());
+    fx.parts.push({ x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v, life: 1, decay: 1.4 + Math.random(), size: 2 + Math.random() * 3.5, color, star: Math.random() < 0.6 });
+  }
+  runFx();
+}
+function ring(x, y, color, max) { if (reduced) return; fx.parts.push({ x, y, ring: true, life: 1, decay: 2.6, max, color }); runFx(); }
+function trail(x0, y0, x1, y1) { if (reduced) return; fx.trails.push({ x0, y0, x1, y1, life: 1 }); runFx(); }
+function star4(ctx, x, y, s) {
+  ctx.beginPath(); ctx.moveTo(x, y - s); ctx.quadraticCurveTo(x, y, x + s, y); ctx.quadraticCurveTo(x, y, x, y + s);
+  ctx.quadraticCurveTo(x, y, x - s, y); ctx.quadraticCurveTo(x, y, x, y - s); ctx.fill();
+}
+function runFx() {
+  if (fx.running) return; fx.running = true;
+  let last = performance.now();
+  const glow = css("--glow"), gold = css("--gold");
+  const tick = now => {
+    const dt = Math.max(0, Math.min(0.05, (now - last) / 1000)); last = now;
+    const c = fx.ctx; if (!c) { fx.running = false; return; }
+    c.setTransform(fx.dpr, 0, 0, fx.dpr, 0, 0);
+    c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+    c.lineCap = "round";
+    for (const t of fx.trails) {
+      t.life -= dt * 3.2;
+      if (t.life <= 0) continue;
+      c.strokeStyle = glow; c.globalAlpha = t.life * 0.5; c.lineWidth = 8 * t.life;
+      c.beginPath(); c.moveTo(t.x0, t.y0); c.lineTo(t.x1, t.y1); c.stroke();
+      c.strokeStyle = "#fff6cc"; c.globalAlpha = t.life * 0.9; c.lineWidth = 2.4 * t.life;
+      c.beginPath(); c.moveTo(t.x0, t.y0); c.lineTo(t.x1, t.y1); c.stroke();
+    }
+    for (const p of fx.parts) {
+      p.life -= dt * p.decay;
+      if (p.life <= 0) continue;
+      if (p.ring) {
+        c.globalAlpha = p.life; c.strokeStyle = p.color || gold; c.lineWidth = 2;
+        c.beginPath(); c.arc(p.x, p.y, p.max * (1 - p.life * p.life), 0, Math.PI * 2); c.stroke();
+        continue;
+      }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.vx *= 0.92; p.vy *= 0.92;
+      c.globalAlpha = Math.min(1, p.life * 1.5); c.fillStyle = p.color || gold;
+      if (p.star) star4(c, p.x, p.y, p.size * (0.6 + p.life * 0.6));
+      else { c.beginPath(); c.arc(p.x, p.y, p.size * 0.45 * p.life, 0, Math.PI * 2); c.fill(); }
+    }
+    c.globalAlpha = 1;
+    fx.trails = fx.trails.filter(t => t.life > 0); fx.parts = fx.parts.filter(p => p.life > 0);
+    if (fx.trails.length || fx.parts.length) requestAnimationFrame(tick);
+    else { c.clearRect(0, 0, c.canvas.width, c.canvas.height); fx.running = false; }
+  };
+  requestAnimationFrame(tick);
+}
+
+// ================= snake geometry =================
+function buildTrack(s, extra) {
+  const pts = s.cells.map(([x, y]) => [x + 0.5, y + 0.5]);
+  const [hx, hy] = pts[pts.length - 1], [dx, dy] = DIRS[s.d];
+  for (let k = 1; k <= extra; k++) pts.push([hx + dx * k, hy + dy * k]);
+  return pts;
+}
+function at(pts, u) {
+  u = Math.max(0, u);
+  const i = Math.min(Math.floor(u), pts.length - 2), f = u - i;
+  return [pts[i][0] + (pts[i + 1][0] - pts[i][0]) * f, pts[i][1] + (pts[i + 1][1] - pts[i][1]) * f];
+}
+// Draws the snake at distance `off` along its track; returns the head point.
+function drawSnake(s, off) {
+  off = Math.max(0, off);
+  const L = s.cells.length - 1, pts = s.track, out = [at(pts, off)];
+  for (let i = Math.floor(off) + 1; i < off + L; i++) out.push(pts[i]);
+  const head = at(pts, off + L);
+  const j = Math.min(Math.floor(off + L - 1e-6), pts.length - 2);
+  const dir = [Math.sign(pts[j + 1][0] - pts[j][0]), Math.sign(pts[j + 1][1] - pts[j][1])];
+  out.push([head[0] - dir[0] * HEAD * 0.6, head[1] - dir[1] * HEAD * 0.6]);
+  s.p.setAttribute("d", "M" + out.map(p => p[0].toFixed(3) + " " + p[1].toFixed(3)).join("L"));
+  const tip = [head[0] + dir[0] * HEAD * 0.45, head[1] + dir[1] * HEAD * 0.45];
+  const back = [head[0] - dir[0] * HEAD * 0.55, head[1] - dir[1] * HEAD * 0.55], px = -dir[1] * HEAD * 0.5, py = dir[0] * HEAD * 0.5;
+  s.h.setAttribute("points", `${tip[0].toFixed(3)},${tip[1].toFixed(3)} ${(back[0] + px).toFixed(3)},${(back[1] + py).toFixed(3)} ${(back[0] - px).toFixed(3)},${(back[1] - py).toFixed(3)}`);
+  return head;
+}
+function animate(dur, step, done) {
+  if (reduced) dur = Math.min(dur, 150);
+  const t0 = performance.now();
+  const tick = now => {
+    const t = Math.max(0, Math.min(1, (now - t0) / dur));
+    step(t);
+    if (t < 1) requestAnimationFrame(tick); else done && done();
+  };
+  requestAnimationFrame(tick);
+}
+
+// ================= home =================
+function renderHome() {
+  $("home").hidden = false; $("game").hidden = true; $("overlay").hidden = true;
+  const cur = Math.min(save.unlocked, LEVELS);
+  $("homeHints").textContent = save.hints;
+  const d = new Date();
+  $("dailyDate").textContent = `${MONTHS[d.getMonth()]} ${d.getDate()}`;
+  const dailyDone = save.daily === today();
+  $("dailyCard").classList.toggle("done", dailyDone);
+  $("dailyGo").textContent = dailyDone ? "Done today" : "Start";
+  const stars = Object.values(save.stars).reduce((a, b) => a + b, 0);
+  $("allSub").textContent = `${stars} ★ collected`;
+  const strip = $("strip"); strip.innerHTML = "";
+  SHAPES.forEach(sh => {
+    const got = save.pics[sh.name];
+    strip.insertAdjacentHTML("beforeend", `<div class="thumb ${got ? "" : "locked"}" title="${got ? sh.name : "?"}" style="color:${got ? "var(--accent)" : "var(--ink)"}">${picSvg(sh)}${got ? "" : '<span class="q">?</span>'}</div>`);
+  });
+  const path = $("path"); path.innerHTML = "";
+  const start = Math.max(1, Math.min(cur - 1, LEVELS - 4));
+  for (let n = start; n < start + 5; n++) {
+    const b = document.createElement("button");
+    const locked = n > save.unlocked;
+    b.className = "node" + (n % 10 === 0 ? " boss" : "") + (n === cur ? " cur" : "") + (n < cur ? " done" : "") + (locked ? " locked" : "");
+    b.textContent = n; b.setAttribute("aria-label", "Level " + n + (locked ? ", locked" : ""));
+    if (!locked) b.onclick = () => startLevel(n); else b.style.cursor = "default";
+    path.appendChild(b);
+  }
+  $("playSub").textContent = save.unlocked > LEVELS ? "All levels done!" : "Level " + cur;
+}
+$("playBtn").onclick = () => { audio(); startLevel(Math.min(save.unlocked, LEVELS)); };
+$("dailyCard").onclick = () => { audio(); startDaily(); };
+$("allCard").onclick = () => showLevels();
+$("galleryBtn").onclick = () => showGallery();
+$("homeSettings").onclick = () => showSettings();
+$("levelsBtn").onclick = () => showLevels();
+
+function showLevels() {
+  let html = "<h2>All Levels</h2><div class='grid'>";
+  for (let n = 1; n <= LEVELS; n++) {
+    const locked = n > save.unlocked, three = save.stars[n] === 3;
+    html += `<button data-n="${n}" class="${n % 10 === 0 ? "boss" : ""} ${locked ? "locked" : ""} ${three ? "star" : ""}" aria-label="Level ${n}${locked ? ", locked" : ""}">${n}</button>`;
+  }
+  html += "</div><div class='row'><button class='btn' id='oClose'>Close</button></div>";
+  const o = overlay(html);
+  o.querySelectorAll(".grid button").forEach(b => { const n = +b.dataset.n; if (n <= save.unlocked) b.onclick = () => startLevel(n); });
+  o.querySelector("#oClose").onclick = () => o.hidden = true;
+}
+function showGallery() {
+  const got = Object.keys(save.pics).length;
+  let html = `<h2>Picture Gallery</h2><p>${got} of ${SHAPES.length} pictures revealed</p><div class='pgrid'>`;
+  for (const sh of SHAPES) {
+    const ok = save.pics[sh.name];
+    html += `<div><div class="thumb ${ok ? "" : "locked"}" style="color:${ok ? "var(--accent)" : "var(--ink)"}">${picSvg(sh)}${ok ? "" : '<span class="q">?</span>'}</div><small>${ok ? sh.name : "? ? ?"}</small></div>`;
+  }
+  html += "</div><div class='row'><button class='btn' id='oClose'>Close</button></div>";
+  const o = overlay(html);
+  o.querySelector("#oClose").onclick = () => o.hidden = true;
+}
+function showSettings() {
+  const o = overlay(`<h2>Settings</h2>
+    <div><div class="toggle"><span>Sound</span><button class="sw ${save.sound ? "on" : ""}" id="tSound" aria-label="Sound"></button></div>
+    <div class="toggle"><span>Vibration</span><button class="sw ${save.haptics ? "on" : ""}" id="tHap" aria-label="Vibration"></button></div>
+    <div class="toggle"><span>Theme</span><div class="skins" id="skins">${SKINS.map(([k, c]) => `<button data-k="${k}" class="${currentSkin() === k ? "on" : ""}" style="background:${c}" aria-label="${k}"></button>`).join("")}</div></div>
+    ${Ads.privacy() ? `<div class="toggle"><span>Ad privacy</span><button class="btn" id="tPriv" style="flex:0;padding:8px 14px">Options</button></div>` : ""}</div>
+    <div class="row"><button class="btn primary" id="oClose">Done</button></div>`);
+  o.querySelector("#tSound").onclick = e => { save.sound = !save.sound; persist(); e.target.classList.toggle("on", save.sound); if (save.sound) sfx.hint(); };
+  o.querySelector("#tHap").onclick = e => { save.haptics = !save.haptics; persist(); e.target.classList.toggle("on", save.haptics); buzz(20); };
+  o.querySelectorAll("#skins button").forEach(b => b.onclick = () => { save.skin = b.dataset.k; persist(); applySkin(); sfx.tap(); o.querySelectorAll("#skins button").forEach(x => x.classList.toggle("on", x === b)); });
+  const priv = o.querySelector("#tPriv"); if (priv) priv.onclick = () => Ads.privacyOptions();
+  o.querySelector("#oClose").onclick = () => o.hidden = true;
+}
+function currentSkin() { return save.skin || "aurora"; }
+$("skinBtn").onclick = () => { const ks = SKINS.map(s => s[0]); save.skin = ks[(ks.indexOf(currentSkin()) + 1) % ks.length]; persist(); applySkin(); sfx.tap(); };
+
+// ================= game =================
+let G = null;
+const cache = {};
+
+function startLevel(n) { begin({ kind: "level", n }, () => cache[n] || (cache[n] = makeLevel(n))); }
+function startDaily() {
+  const key = today(), seed = +key.replace(/-/g, "");
+  begin({ kind: "daily", n: 0, key }, () => cache[key] || (cache[key] = makeBoard({ ...levelSpec(18), n: 18, shape: SHAPES[seed % SHAPES.length], boss: false }, seed)));
+}
+
+function begin(meta, gen) {
+  G = null;
+  $("home").hidden = true; $("game").hidden = false; $("overlay").hidden = true;
+  $("lvTitle").textContent = meta.kind === "daily" ? "Daily" : (meta.n % 10 === 0 ? "Boss " : "Level ") + meta.n;
+  $("svg").innerHTML = ""; $("foot").textContent = ""; $("drops").innerHTML = "";
+  $("hintCount").textContent = save.hints;
+  const banner = $("banner"); banner.hidden = false; banner.innerHTML = "Drawing the puzzle…";
+  setTimeout(() => setup(meta, gen()), 30);
+}
+
+function setup(meta, L) {
+  G = { ...meta, W: L.W, H: L.H, lives: 3, combo: 0, lastFly: 0, done: false, ready: false, left: L.snakes.length, total: L.snakes.length, shape: L.shape };
+  $("prog").style.width = "0%";
+  G.owner = new Int16Array(L.W * L.H).fill(-1);
+  G.snakes = L.snakes.map((s, i) => { s.cells.forEach(([x, y]) => G.owner[y * L.W + x] = i); return { cells: s.cells, d: s.d, id: i, alive: true, busy: false }; });
+  const svg = $("svg");
+  svg.setAttribute("viewBox", `${-PAD} ${-PAD} ${L.W + 2 * PAD} ${L.H + 2 * PAD}`);
+  const frag = document.createDocumentFragment();
+  // faint silhouette of the picture under the arrows; it lights up gold when the board is cleared
+  const sil = document.createElementNS(NS, "g"); sil.setAttribute("class", "sil"); sil.setAttribute("id", "sil");
+  for (let y = 0; y < L.H; y++) for (let x = 0; x < L.W; x++) if (L.mask[y * L.W + x]) {
+    const rc = document.createElementNS(NS, "rect");
+    rc.setAttribute("x", x - 0.02); rc.setAttribute("y", y - 0.02); rc.setAttribute("width", 1.04); rc.setAttribute("height", 1.04);
+    sil.appendChild(rc);
+  }
+  frag.appendChild(sil);
+  for (const s of G.snakes) {
+    const g = document.createElementNS(NS, "g"); g.setAttribute("class", "sn");
+    s.p = document.createElementNS(NS, "path"); s.p.setAttribute("vector-effect", "non-scaling-stroke");
+    s.h = document.createElementNS(NS, "polygon");
+    g.append(s.p, s.h); s.el = g; frag.appendChild(g);
+    s.track = buildTrack(s, Math.max(L.W, L.H) + s.cells.length + 3);
+    drawSnake(s, 0);
+  }
+  svg.appendChild(frag);
+  resetZoom();
+  layout();
+  renderDrops(true);
+  $("foot").textContent = `${G.left} left`;
+  const banner = $("banner");
+  banner.innerHTML = meta.kind === "daily" ? `Today's puzzle<br><b>${L.snakes.length} arrows</b>` : `Level ${meta.n}<br><b>${L.snakes.length} arrows</b>`;
+  sfx.start();
+  const game = G;
+  $("board").animate([{ transform: "scale(1.6)", opacity: 0.2 }, { transform: "scale(1)", opacity: 1 }], { duration: reduced ? 1 : 750, easing: "cubic-bezier(.2,.8,.2,1)" });
+  setTimeout(() => { game.ready = true; }, reduced ? 0 : 450);
+  setTimeout(() => { if (G === game) banner.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 400 }).onfinish = () => { if (G === game) banner.hidden = true; }; }, 1300);
+}
+
+// The board is laid out at its real zoomed size (Z.base) so the SVG stays sharp; the CSS transform only covers the gap during a gesture.
+function layout() {
+  if (!G) return;
+  const st = $("stage"), ratio = (G.W + 2 * PAD) / (G.H + 2 * PAD);
+  let w = st.clientWidth - 8, h = w / ratio;
+  if (h > st.clientHeight) { h = st.clientHeight; w = h * ratio; }
+  w = Math.floor(w); h = Math.floor(h);
+  const zoom = $("zoom"); zoom.style.width = st.clientWidth * Z.base + "px"; zoom.style.height = st.clientHeight * Z.base + "px";
+  const bw = Math.round(w * Z.base), bh = Math.round(h * Z.base);
+  const board = $("board"); board.style.width = bw + "px"; board.style.height = bh + "px";
+  G.cell = bw / (G.W + 2 * PAD);
+  G.sw = Math.max(1.3, Math.min(2.6, (w / (G.W + 2 * PAD)) * 0.11)); setStroke();
+  fxSize(bw, bh, G.cell);
+}
+window.addEventListener("resize", () => { Z.base = 1; layout(); applyZoom(false); commitZoom(); });
+
+function renderDrops(intro) {
+  $("drops").innerHTML = [0, 1, 2].map(i => `<i class="${i < G.lives ? (intro ? "pop" : "") : "gone"}" style="animation-delay:${intro ? 0.25 + i * 0.12 : 0}s"></i>`).join("");
+}
+
+// ---------- zoom & pan: pinch or wheel to zoom, drag to move, tap to fire ----------
+const Z = { z: 1, base: 1, tx: 0, ty: 0, pts: new Map(), moved: false, pinch: null, drag: null, timer: 0 };
+const ZMAX = 5;
+// screen stroke grows with sqrt(zoom): thicker when zoomed in, but never fat
+function setStroke() { if (G && G.sw) $("svg").style.setProperty("--sw", (G.sw * Math.sqrt(Z.z) * Z.base / Z.z).toFixed(3)); }
+// re-lay out the board at the current zoom so it is rendered at full resolution
+function commitZoom() {
+  clearTimeout(Z.timer);
+  if (!G || Z.base === Z.z) return;
+  Z.base = Z.z; layout(); applyZoom(false);
+}
+function commitSoon(ms) { clearTimeout(Z.timer); Z.timer = setTimeout(commitZoom, ms); }
+function applyZoom(anim) {
+  const st = $("stage"), w = st.clientWidth, h = st.clientHeight;
+  Z.z = Math.min(ZMAX, Math.max(1, Z.z));
+  Z.tx = Math.min(0, Math.max(w * (1 - Z.z), Z.tx)); Z.ty = Math.min(0, Math.max(h * (1 - Z.z), Z.ty));
+  const el = $("zoom");
+  el.style.transition = anim && !reduced ? "transform .25s cubic-bezier(.2,.8,.2,1)" : "none";
+  el.style.transform = `translate(${Z.tx}px,${Z.ty}px) scale(${Z.z / Z.base})`;
+  $("zLevel").textContent = (Math.round(Z.z * 10) / 10) + "×";
+  setStroke();
+}
+function zoomAt(nz, px, py, anim) {
+  nz = Math.min(ZMAX, Math.max(1, nz));
+  Z.tx = px - (px - Z.tx) * (nz / Z.z); Z.ty = py - (py - Z.ty) * (nz / Z.z); Z.z = nz;
+  applyZoom(anim);
+}
+function resetZoom() { Z.z = 1; Z.base = 1; Z.tx = 0; Z.ty = 0; applyZoom(false); }
+const stagePt = e => { const r = $("stage").getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+$("zIn").onclick = () => { const st = $("stage"); zoomAt(Z.z * 1.5, st.clientWidth / 2, st.clientHeight / 2, true); commitSoon(280); };
+$("zOut").onclick = () => { const st = $("stage"); zoomAt(Z.z / 1.5, st.clientWidth / 2, st.clientHeight / 2, true); commitSoon(280); };
+$("zFit").onclick = () => { Z.z = 1; Z.tx = 0; Z.ty = 0; applyZoom(true); commitSoon(280); };
+$("stage").addEventListener("wheel", e => {
+  e.preventDefault();
+  const [px, py] = stagePt(e);
+  zoomAt(Z.z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0025)), px, py, false); commitSoon(160);
+}, { passive: false });
+$("stage").addEventListener("pointerdown", e => {
+  if (e.target.closest(".zbar")) return;
+  try { $("stage").setPointerCapture(e.pointerId); } catch (err) {}
+  Z.pts.set(e.pointerId, stagePt(e));
+  if (Z.pts.size === 1) { Z.moved = false; Z.drag = { start: stagePt(e), tx: Z.tx, ty: Z.ty }; Z.pinch = null; }
+  if (Z.pts.size === 2) {
+    const [a, b] = [...Z.pts.values()], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    Z.pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, z: Z.z, cx: (mid[0] - Z.tx) / Z.z, cy: (mid[1] - Z.ty) / Z.z };
+    Z.moved = true;
+  }
+});
+$("stage").addEventListener("pointermove", e => {
+  if (!Z.pts.has(e.pointerId)) return;
+  Z.pts.set(e.pointerId, stagePt(e));
+  if (Z.pinch && Z.pts.size >= 2) {
+    const [a, b] = [...Z.pts.values()], mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const nz = Math.min(ZMAX, Math.max(1, Z.pinch.z * Math.hypot(a[0] - b[0], a[1] - b[1]) / Z.pinch.d));
+    Z.z = nz; Z.tx = mid[0] - Z.pinch.cx * nz; Z.ty = mid[1] - Z.pinch.cy * nz;
+    applyZoom(false);
+  } else if (Z.drag && Z.pts.size === 1) {
+    const p = Z.pts.get(e.pointerId), dx = p[0] - Z.drag.start[0], dy = p[1] - Z.drag.start[1];
+    if (Math.hypot(dx, dy) > 8) Z.moved = true;
+    if (Z.moved && Z.z > 1) { Z.tx = Z.drag.tx + dx; Z.ty = Z.drag.ty + dy; applyZoom(false); }
+  }
+});
+function pointerEnd(e) {
+  if (!Z.pts.has(e.pointerId)) return;
+  Z.pts.delete(e.pointerId);
+  if (Z.pts.size === 1 && Z.pinch) { const p = [...Z.pts.values()][0]; Z.pinch = null; Z.drag = { start: p, tx: Z.tx, ty: Z.ty }; return; }
+  if (Z.pts.size === 0) {
+    if (!Z.moved && e.type === "pointerup") pickAt(e.clientX, e.clientY);
+    Z.drag = null; Z.pinch = null; commitZoom();
+  }
+}
+$("stage").addEventListener("pointerup", pointerEnd);
+$("stage").addEventListener("pointercancel", pointerEnd);
+$("stage").addEventListener("dblclick", e => { const [px, py] = stagePt(e); zoomAt(Z.z > 1.4 ? 1 : 2.5, px, py, true); commitSoon(280); });
+
+// pick the snake under the finger, or the nearest one within about a cell
+function pickAt(clientX, clientY) {
+  if (!G || !G.ready || G.done) return;
+  const rect = $("board").getBoundingClientRect(), cpx = rect.width / (G.W + 2 * PAD), k = Z.z / Z.base;
+  const bx = (clientX - rect.left) / cpx - PAD, by = (clientY - rect.top) / cpx - PAD;
+  let best = -1, bd = 1.0;
+  for (let y = Math.floor(by) - 1; y <= Math.floor(by) + 1; y++) for (let x = Math.floor(bx) - 1; x <= Math.floor(bx) + 1; x++) {
+    if (x < 0 || y < 0 || x >= G.W || y >= G.H) continue;
+    const o = G.owner[y * G.W + x]; if (o < 0) continue;
+    const dd = Math.hypot(x + 0.5 - bx, y + 0.5 - by);
+    if (dd < bd) { bd = dd; best = o; }
+  }
+  if (best >= 0) tap(G.snakes[best], (clientX - rect.left) / k, (clientY - rect.top) / k);
+}
+
+function blocker(s) {
+  const [hx, hy] = s.cells[s.cells.length - 1], [dx, dy] = DIRS[s.d];
+  for (let x = hx + dx, y = hy + dy, k = 1; x >= 0 && y >= 0 && x < G.W && y < G.H; x += dx, y += dy, k++) {
+    const o = G.owner[y * G.W + x];
+    if (o >= 0 && o !== s.id) return { b: G.snakes[o], k, x, y };
+  }
+  return null;
+}
+
+function tap(s, px, py) {
+  if (!s.alive || s.busy) return;
+  clearHint();
+  sfx.tap();
+  if (px !== undefined) { ring(px, py, css("--gold"), G.cell * 1.6); sparkle(px, py, 6, G.cell * 5); }
+  const hit = blocker(s);
+  if (!hit) fly(s); else bump(s, hit);
+}
+
+function fly(s) {
+  const game = G;
+  s.alive = false; s.busy = true;
+  s.cells.forEach(([x, y]) => G.owner[y * G.W + x] = -1);
+  s.el.classList.add("fly"); s.el.parentNode.appendChild(s.el);
+  G.left--; $("foot").textContent = G.left ? `${G.left} left` : "Clear!";
+  $("prog").style.width = (100 * (G.total - G.left) / G.total).toFixed(1) + "%";
+  const now = performance.now();
+  G.combo = now - G.lastFly < 1100 ? G.combo + 1 : 0; G.lastFly = now;
+  sfx.whoosh(G.combo); buzz(10);
+  if (G.combo >= 2) showCombo(G.combo + 1);
+  const total = s.track.length - 1 - (s.cells.length - 1);
+  let prev = null;
+  animate(300 + total * 14, t => {
+    const off = t < 0.12 ? -0.25 * Math.sin(t / 0.12 * Math.PI) : total * Math.pow((t - 0.12) / 0.88, 1.7);
+    const head = drawSnake(s, off), hp = toPx(head[0], head[1]);
+    if (prev && t > 0.12) { trail(prev[0], prev[1], hp[0], hp[1]); if (Math.random() < 0.5) sparkle(hp[0], hp[1], 1, G ? G.cell * 2 : 20); }
+    prev = hp;
+  }, () => {
+    s.el.remove();
+    if (G === game && !G.left && !G.done) { G.done = true; setTimeout(win, 250); }
+  });
+}
+
+function bump(s, hit) {
+  s.busy = true; s.el.classList.add("bad"); hit.b.el.classList.add("bad");
+  const reach = hit.k - 1 + 0.35;
+  let hitDone = false;
+  animate(220 + hit.k * 45, t => {
+    drawSnake(s, reach * Math.sin(Math.PI * t));
+    if (!hitDone && t >= 0.5) {
+      hitDone = true;
+      const [cx, cy] = toPx(hit.x + 0.5 - DIRS[s.d][0] * 0.5, hit.y + 0.5 - DIRS[s.d][1] * 0.5);
+      ring(cx, cy, css("--bad"), fx.cell * 1.8); sparkle(cx, cy, 5, fx.cell * 3, css("--bad"));
+      sfx.thud(); buzz([25, 30, 25]);
+      const board = $("board"); board.classList.remove("shake"); void board.offsetWidth; board.classList.add("shake");
+    }
+  }, () => {
+    drawSnake(s, 0); s.busy = false;
+    setTimeout(() => { s.el.classList.remove("bad"); hit.b.el.classList.remove("bad"); }, 250);
+  });
+  G.combo = 0; G.lives--;
+  const lost = $("drops").children[G.lives];
+  if (lost) { lost.classList.remove("pop"); lost.classList.add("fall"); }
+  setTimeout(() => sfx.drop(), 140);
+  if (G.lives <= 0) { G.done = true; setTimeout(lose, 700); }
+}
+
+function showCombo(k) {
+  const el = $("combo"); el.textContent = `Combo ×${k}`;
+  el.animate([{ opacity: 0, transform: "translate(-50%,8px) scale(.7)" }, { opacity: 1, transform: "translate(-50%,0) scale(1.15)", offset: 0.25 }, { opacity: 0, transform: "translate(-50%,-14px) scale(1)" }], { duration: 850 });
+}
+
+function clearHint() { if (G) G.snakes.forEach(s => s.el && s.el.classList.remove("hint")); }
+// Ads exist only inside the Android app (window.ArrowAds from MainActivity). In a browser every call is a no-op that reports "no ad".
+const Ads = (() => {
+  const A = window.ArrowAds; let pending = null;
+  window.__adDone = ok => { const cb = pending; pending = null; if (cb) cb(!!ok); };
+  const call = f => { try { return f(); } catch (e) { return false; } };
+  return {
+    on: !!A,
+    rewardedReady: () => !!A && call(() => A.isRewardedReady()),
+    privacy: () => !!A && call(() => A.privacyOptionsRequired()),
+    privacyOptions: () => A && call(() => A.showPrivacyOptions()),
+    show(kind, cb) {
+      if (!A || pending) return cb(false);
+      pending = cb;
+      if (call(() => (kind === "rewarded" ? A.showRewarded() : A.showInterstitial(), true)) === false) window.__adDone(false);
+    }
+  };
+})();
+
+function offerHintAd() {
+  if (!Ads.rewardedReady()) { $("foot").textContent = "No hints · ad loading, try again soon"; return; }
+  const o = overlay(`
+    <h2>Out of hints</h2>
+    <p>Watch a short video to get a free hint.</p>
+    <div class="row">
+      <button class="btn" id="oNo">Not now</button>
+      <button class="btn primary" id="oAd">Watch ad</button>
+    </div>`);
+  o.querySelector("#oNo").onclick = () => { o.hidden = true; };
+  o.querySelector("#oAd").onclick = () => {
+    o.hidden = true;
+    Ads.show("rewarded", ok => {
+      if (!ok) { $("foot").textContent = "No reward this time · try again"; return; }
+      save.hints++; persist(); $("hintCount").textContent = save.hints;
+      $("hintBtn").onclick();
+    });
+  };
+}
+
+$("hintBtn").onclick = () => {
+  if (!G || G.done || !G.ready) return;
+  if (save.hints <= 0) { if (Ads.on) offerHintAd(); else $("foot").textContent = "No hints · 3★ a level"; return; }
+  const free = G.snakes.filter(s => s.alive && !s.busy && !blocker(s));
+  if (!free.length) return;
+  clearHint();
+  const s = free[(Math.random() * free.length) | 0];
+  s.el.classList.add("hint"); s.el.parentNode.appendChild(s.el);
+  const [hx, hy] = s.cells[s.cells.length - 1];
+  const [cx, cy] = toPx(hx + 0.5, hy + 0.5);
+  ring(cx, cy, css("--accent"), G.cell * 3); sparkle(cx, cy, 10, G.cell * 4, css("--accent"));
+  sfx.hint();
+  save.hints--; persist(); $("hintCount").textContent = save.hints;
+};
+$("restartBtn").onclick = () => G && (G.kind === "daily" ? startDaily() : startLevel(G.n));
+$("backBtn").onclick = () => { G = null; renderHome(); };
+
+function overlay(html) { const o = $("overlay"); o.innerHTML = `<div class="sheet">${html}</div>`; o.hidden = false; return o; }
+
+function celebrate() {
+  const b = $("board"), w = b.clientWidth, h = b.clientHeight;
+  for (let i = 0; i < 7; i++) setTimeout(() => {
+    const x = w * (0.2 + Math.random() * 0.6), y = h * (0.2 + Math.random() * 0.6);
+    ring(x, y, css("--gold"), 60); sparkle(x, y, 16, 220);
+  }, i * 110);
+}
+
+function win() {
+  const stars = G.lives, n = G.n, daily = G.kind === "daily", shape = G.shape;
+  const isPic = shape !== GRAND;
+  // the picture lights up first, then the result sheet
+  $("sil").classList.add("reveal"); sfx.reveal(); buzz([30, 40, 60]); celebrate();
+  let extra = "", adBreak = false;
+  if (daily) { if (save.daily !== G.key) { save.hints += 2; extra = " · +2 hints"; } save.daily = G.key; }
+  else {
+    const isNew = (save.stars[n] || 0) < 3 && stars === 3;
+    save.stars[n] = Math.max(save.stars[n] || 0, stars);
+    if (isNew) { save.hints++; extra = " · +1 hint"; }
+    save.unlocked = Math.max(save.unlocked, n + 1);
+    // ad break on every 3rd win after level 15 (first one at level 18 when playing in order)
+    if (n > 15) { save.adWins = (save.adWins || 0) + 1; adBreak = Ads.on && save.adWins % 3 === 0; }
+  }
+  const newPic = isPic && !save.pics[shape.name];
+  if (isPic) save.pics[shape.name] = true;
+  persist();
+  const last = !daily && n >= LEVELS;
+  const msg = stars === 3 ? "Flawless! Not a single miss." : stars === 2 ? "Great! Just one slip." : "Made it on the last cell!";
+  setTimeout(() => {
+    sfx.win();
+    const o = overlay(`
+      <div class="stars">${[1, 2, 3].map(i => STAR.replace("<svg", `<svg class="${i <= stars ? "on" : ""}"`)).join("")}</div>
+      ${isPic ? `<div class="pic" style="color:var(--gold)">${picSvg(shape)}</div>` : ""}
+      <h2>${isPic ? shape.name + (newPic ? " revealed!" : "!") : daily ? "Daily cleared!" : last ? "All levels done!" : "Maze cleared!"}</h2>
+      <p>${msg}${extra}${newPic ? " · New picture in your gallery" : ""}</p>
+      <div class="row">
+        <button class="btn" id="oRetry">${daily ? "Home" : "Replay"}</button>
+        <button class="btn primary" id="oNext">${daily || last ? "Home" : "Next level"}</button>
+      </div>`);
+    const after = f => () => { if (!adBreak) return f(); adBreak = false; o.hidden = true; Ads.show("interstitial", f); };
+    o.querySelector("#oRetry").onclick = after(() => daily ? (G = null, renderHome()) : startLevel(n));
+    o.querySelector("#oNext").onclick = after(() => daily || last ? (G = null, renderHome()) : startLevel(n + 1));
+  }, 1100);
+}
+
+function lose() {
+  sfx.lose(); buzz(90);
+  const meta = { kind: G.kind, n: G.n };
+  const o = overlay(`
+    <h2>Out of energy!</h2>
+    <p>Only an arrow with nothing in front of its head can fly. Look for the one everyone else is waiting on.</p>
+    <div class="row">
+      <button class="btn" id="oHome">Home</button>
+      <button class="btn primary" id="oRetry">Try again</button>
+    </div>`);
+  o.querySelector("#oRetry").onclick = () => meta.kind === "daily" ? startDaily() : startLevel(meta.n);
+  o.querySelector("#oHome").onclick = () => { G = null; renderHome(); };
+}
+
+renderHome();
+</script>
+</body></html>
